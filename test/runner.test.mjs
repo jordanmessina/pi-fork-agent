@@ -8,7 +8,7 @@ import test from "node:test";
 
 const runnerPath = new URL("../runner.mjs", import.meta.url);
 
-async function runRunner({ compaction } = {}) {
+async function runRunner({ compaction, toolMismatch } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "pi-fork-runner-test-"));
   const resultPath = join(directory, "result.json");
   const tracePath = join(directory, "trace.jsonl");
@@ -16,6 +16,13 @@ async function runRunner({ compaction } = {}) {
   const sdkPath = join(directory, "fake-sdk.mjs");
   const aiPath = join(directory, "fake-ai.mjs");
   const configPath = join(directory, "config.json");
+  const toolDefinitions = [
+    {
+      name: "fork_agent",
+      description: "Fork a focused child",
+      parameters: { type: "object", properties: { task: { type: "string" } } },
+    },
+  ];
 
   await writeFile(
     sdkPath,
@@ -28,7 +35,7 @@ export const SessionManager = { open() { return manager; } };
 export async function createAgentSession() {
   const agent = {
     sessionId: "persisted-child-id",
-    state: { messages: [{ role: "user", content: [{ type: "text", text: "inherited" }] }], systemPrompt: "initial" },
+    state: { messages: [{ role: "user", content: [{ type: "text", text: "inherited" }] }], systemPrompt: "initial", tools: ${JSON.stringify(toolDefinitions)} },
     prepareNextTurnWithContext: async (turn) => ({ context: turn.context }),
     abort() {},
     async prompt(message) {
@@ -73,6 +80,9 @@ export function cleanupSessionResources(id) {
       thinkingLevel: "off",
       scopedModels: [],
       tools: ["fork_agent"],
+      toolDefinitions: toolMismatch
+        ? [{ ...toolDefinitions[0], description: "different parent definition" }]
+        : toolDefinitions,
       systemPrompt: "PINNED_SYSTEM_PROMPT",
       task: "focused task",
     })}\n`,
@@ -110,6 +120,17 @@ test("runner shares cache identity while pinning prompt and cleaning resources",
     });
     assert.ok(run.trace.some((entry) => entry.disposed));
     assert.ok(run.trace.some((entry) => entry.cleanup === "parent-cache-id"));
+  } finally {
+    await rm(run.directory, { recursive: true, force: true });
+  }
+});
+
+test("runner rejects reconstructed tool definitions that differ from the parent", async () => {
+  const run = await runRunner({ toolMismatch: true });
+  try {
+    assert.equal(run.code, 1, run.stderr);
+    assert.equal(run.result.ok, false);
+    assert.match(run.result.text, /tool definitions differ from the parent/);
   } finally {
     await rm(run.directory, { recursive: true, force: true });
   }

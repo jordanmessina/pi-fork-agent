@@ -61,6 +61,20 @@ try {
 		sessionManager: childSessionManager,
 	}));
 
+	const reconstructedToolDefinitions = child.agent.state.tools.map((tool) => ({
+		name: tool.name,
+		description: tool.description,
+		parameters: tool.parameters,
+	}));
+	if (
+		JSON.stringify(reconstructedToolDefinitions) !==
+		JSON.stringify(config.toolDefinitions)
+	) {
+		throw new Error(
+			"Forked child tool definitions differ from the parent; refusing to change the provider-cache prefix.",
+		);
+	}
+
 	// The persisted child ID remains unique, while every child process uses the
 	// parent's provider cache identity. Each process has its own Pi module state
 	// and therefore its own reusable WebSocket and continuation chain.

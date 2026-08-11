@@ -16,6 +16,6 @@ test("package declares a discoverable Pi extension", async () => {
 
 test("package documentation does not promise unconditional schema or cache identity", async () => {
   const readme = await readFile(new URL("README.md", root), "utf8");
-  assert.match(readme, /exact schema identity depends on deterministic extensions/);
+  assert.match(readme, /compare those provider-visible fields with the parent capture/);
   assert.match(readme, /Cache compatibility is an optimization, not a guarantee/);
 });

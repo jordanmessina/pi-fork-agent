@@ -1,4 +1,4 @@
-Issue all four fork_agent calls in a single assistant turn, before seeing any of their results. Do not add background or restate the evaluation brief in the delegated tasks. Pass these task strings verbatim:
+Your next assistant message must contain exactly four sibling fork_agent tool calls issued in parallel, before seeing any result. Do not issue one call and wait. Do not add background or restate the evaluation brief in the delegated tasks. Pass these task strings verbatim:
 
 1. "Audit the implementation against the authoritative evaluation brief. Begin with `Canary:` followed by the context canary. Report only concrete violations or say that none were found."
 

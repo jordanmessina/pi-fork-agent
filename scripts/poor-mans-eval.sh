@@ -41,6 +41,21 @@ python3 - "$EVAL_DIR" "$parent" <<'PY'
 import glob, json, os, sys
 
 directory, parent_file = sys.argv[1:]
+with open(parent_file) as stream:
+    parent_entries = [json.loads(line) for line in stream]
+fork_batches = []
+for entry in parent_entries:
+    message = entry.get("message", {})
+    if entry.get("type") != "message" or message.get("role") != "assistant":
+        continue
+    calls = [
+        part for part in message.get("content", [])
+        if part.get("type") == "toolCall" and part.get("name") == "fork_agent"
+    ]
+    if calls:
+        fork_batches.append(len(calls))
+parallel_fork_batch = fork_batches == [4]
+
 children = []
 for path in glob.glob(directory + "/*.jsonl"):
     with open(path) as stream:
@@ -99,6 +114,8 @@ followups = [value for row in rows for value in row["cacheReads"][1:]]
 summary = {
     "directory": directory,
     "children": len(children),
+    "forkBatches": fork_batches,
+    "parallelForkBatch": parallel_fork_batch,
     "initialCacheHits": f"{initial_hits}/{len(rows)}",
     "followupCacheHits": f"{sum(value > 0 for value in followups)}/{len(followups)}",
     "totalCacheHits": f"{sum(value > 0 for row in rows for value in row['cacheReads'])}/{sum(len(row['cacheReads']) for row in rows)}",
@@ -107,7 +124,7 @@ summary = {
     "requests": rows,
 }
 print(json.dumps(summary, indent=2))
-if len(children) != 4 or grandchildren or compactions:
+if len(children) != 4 or not parallel_fork_batch or grandchildren or compactions:
     raise SystemExit(1)
 PY
 

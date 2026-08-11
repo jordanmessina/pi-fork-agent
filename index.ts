@@ -43,6 +43,12 @@ interface RunnerResult {
 	stopReason?: string;
 }
 
+interface SerializedToolDefinition {
+	name: string;
+	description: string;
+	parameters: unknown;
+}
+
 function appendDiagnostic(current: string, chunk: Buffer): string {
 	return (current + chunk.toString("utf8")).slice(-MAX_RUNNER_DIAGNOSTIC_LENGTH);
 }
@@ -127,12 +133,27 @@ async function runChildProcess(
 
 export default function forkAgentExtension(pi: ExtensionAPI) {
 	let activeToolNames: string[] | undefined;
+	let activeToolDefinitions: SerializedToolDefinition[] | undefined;
 
 	// The extension context intentionally exposes only a read-only session manager.
-	// Capture the active tool ordering at prompt start so the child can reproduce the
-	// provider-visible tool prefix instead of falling back to Pi's default tools.
+	// Capture the active tool ordering and public provider-schema fields at prompt
+	// start. The runner rejects nondeterministic child reconstruction before prompting.
 	pi.on("before_agent_start", (event) => {
-		activeToolNames = [...(event.systemPromptOptions.selectedTools ?? [])];
+		activeToolNames = [
+			...(event.systemPromptOptions.selectedTools ?? pi.getActiveTools()),
+		];
+		const definitionsByName = new Map(
+			pi.getAllTools().map((tool) => [tool.name, tool] as const),
+		);
+		activeToolDefinitions = activeToolNames.map((name) => {
+			const tool = definitionsByName.get(name);
+			if (!tool) throw new Error(`Cannot capture active tool definition: ${name}`);
+			return {
+				name: tool.name,
+				description: tool.description,
+				parameters: tool.parameters,
+			};
+		});
 	});
 
 	pi.on("session_before_compact", (event, ctx) => {
@@ -171,7 +192,7 @@ export default function forkAgentExtension(pi: ExtensionAPI) {
 			if (!ctx.model) {
 				throw new Error("Cannot fork an agent without an active model.");
 			}
-			if (!activeToolNames) {
+			if (!activeToolNames || !activeToolDefinitions) {
 				throw new Error("Cannot fork before the parent prompt configuration is available.");
 			}
 			if (signal?.aborted) {
@@ -196,6 +217,7 @@ export default function forkAgentExtension(pi: ExtensionAPI) {
 			// Preserve the exact provider-visible tool names and ordering for prompt-cache
 			// reuse. A session marker makes fork_agent reject child calls at execution.
 			const childTools = [...activeToolNames];
+			const childToolDefinitions = activeToolDefinitions.map((tool) => ({ ...tool }));
 			const childModel = ctx.model;
 			const childThinkingLevel = ctx.thinkingLevel;
 			const childScopedModels = ctx.scopedModels.map(({ model, thinkingLevel }) => ({ model, thinkingLevel }));
@@ -259,6 +281,7 @@ export default function forkAgentExtension(pi: ExtensionAPI) {
 						thinkingLevel: childThinkingLevel,
 						scopedModels: childScopedModels,
 						tools: childTools,
+						toolDefinitions: childToolDefinitions,
 						systemPrompt: parentSystemPrompt,
 						task: childTask,
 					})}\n`,

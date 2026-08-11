@@ -23,7 +23,7 @@ Restart Pi after installing or updating the package.
 1. Find the assistant message containing the current `fork_agent` call.
 2. Copy the active branch only through that message's parent. This reproduces the provider input that produced the delegation without leaving a dangling tool call.
 3. Create a unique child JSONL beside a persisted parent and link it with `parentSession`.
-4. Launch a dedicated Node process using Pi's SDK with the parent's model, thinking level, effective system prompt, scoped models, working directory, provider cache identity, and active tool-name ordering.
+4. Launch a dedicated Node process using Pi's SDK with the parent's model, thinking level, effective system prompt, scoped models, working directory, provider cache identity, active tool ordering, and captured public tool-schema fields.
 5. Append one focused child task after the inherited prefix.
 6. Return only the child's final assistant text. Child messages and tool traffic remain in the child session.
 
@@ -33,7 +33,7 @@ Each runner has independent Pi module, WebSocket, and continuation state. Authen
 
 The child uses a unique persisted session ID but sets the runtime provider session ID to the parent's session ID. The inherited conversation and system prompt remain unchanged before the appended child task, and `fork_agent` remains in the active tool list.
 
-The extension preserves active tool names and ordering. Child processes reconstruct tool definitions through Pi's normal extension loading pipeline, so exact schema identity depends on deterministic extensions. Provider routing, cache thresholds, transport behavior, and other extensions can still prevent cache reuse. Cache compatibility is an optimization, not a guarantee.
+The extension captures each active tool's name, description, and parameter schema in parent order. Child processes reconstruct executable definitions through Pi's normal extension loading pipeline, then compare those provider-visible fields with the parent capture and fail before prompting if they differ. Provider serialization, routing, cache thresholds, transport behavior, and other extensions can still prevent reuse. Cache compatibility is an optimization, not a guarantee.
 
 ## Safety properties
 
