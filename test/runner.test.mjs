@@ -47,7 +47,16 @@ export async function createAgentSession() {
       });
     },
   };
-  return { session: { agent, dispose() { trace({ disposed: true }); } } };
+  return {
+    session: {
+      agent,
+      extensionRunner: {
+        async emit(event) { trace({ extensionEvent: event.type, reason: event.reason }); },
+      },
+      async bindExtensions(bindings) { trace({ boundMode: bindings.mode }); },
+      dispose() { trace({ disposed: true }); },
+    },
+  };
 }
 `,
   );
@@ -114,10 +123,19 @@ test("runner shares cache identity while pinning prompt and cleaning resources",
   try {
     assert.equal(run.code, 0, run.stderr);
     assert.deepEqual(run.result, { ok: true, text: "RUNNER_OK", stopReason: "stop" });
-    assert.deepEqual(run.trace[0], {
-      sessionId: "parent-cache-id",
-      systemPrompt: "PINNED_SYSTEM_PROMPT",
-    });
+    assert.ok(run.trace.some((entry) => entry.boundMode === "print"));
+    assert.ok(
+      run.trace.some(
+        (entry) =>
+          entry.sessionId === "parent-cache-id" &&
+          entry.systemPrompt === "PINNED_SYSTEM_PROMPT",
+      ),
+    );
+    assert.ok(
+      run.trace.some(
+        (entry) => entry.extensionEvent === "session_shutdown" && entry.reason === "quit",
+      ),
+    );
     assert.ok(run.trace.some((entry) => entry.disposed));
     assert.ok(run.trace.some((entry) => entry.cleanup === "parent-cache-id"));
   } finally {

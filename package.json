@@ -1,6 +1,6 @@
 {
   "name": "pi-fork-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cache-compatible conversation forks for the Pi coding agent",
   "type": "module",
   "license": "MIT",

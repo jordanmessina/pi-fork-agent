@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Bind child extensions before prompting so `session_start` initializes stateful extensions such as `pi-mcp-adapter`.
+- Emit `session_shutdown` before disposing child sessions so extension-owned processes and connections are cleaned up.
+
 ## 0.1.0
 
 - Initial standalone Pi package.

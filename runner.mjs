@@ -8,6 +8,7 @@ const COMPACTION_BLOCKED_MARKER_TYPE = "fork-agent-compaction-blocked";
 let child;
 let cleanupSessionResources;
 let parentSessionId;
+let extensionsBound = false;
 let abortRequested = false;
 
 function finalAssistantMessage(messages) {
@@ -60,6 +61,11 @@ try {
 		tools: config.tools,
 		sessionManager: childSessionManager,
 	}));
+	// createAgentSession() constructs extension runtimes, but SDK callers must bind
+	// them to emit session_start. Stateful extensions such as pi-mcp-adapter do
+	// their per-session initialization there.
+	await child.bindExtensions({ mode: "print" });
+	extensionsBound = true;
 
 	const reconstructedToolDefinitions = child.agent.state.tools.map((tool) => ({
 		name: tool.name,
@@ -153,6 +159,15 @@ try {
 	}
 	process.exitCode = 1;
 } finally {
+	if (child && extensionsBound) {
+		try {
+			await child.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+		} catch (error) {
+			console.error(
+				`fork-agent child extension shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
 	child?.dispose();
 	// AgentSession.dispose() cleans up by the persisted child ID. Provider
 	// resources use the inherited parent ID, so close them explicitly before the

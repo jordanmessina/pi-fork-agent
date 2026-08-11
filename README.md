@@ -27,7 +27,7 @@ Restart Pi after installing or updating the package.
 5. Append one focused child task after the inherited prefix.
 6. Return only the child's final assistant text. Child messages and tool traffic remain in the child session.
 
-Each runner has independent Pi module, WebSocket, and continuation state. Authentication, provider cache identity, working directory, and filesystem are intentionally shared. Parallel children therefore still require file ownership boundaries or separate worktrees when they may write overlapping files.
+Each runner has independent Pi module, WebSocket, continuation, and extension runtime state. The runner binds extensions before prompting, emitting Pi's normal `session_start`, and emits `session_shutdown` before disposal. Stateful extensions such as `pi-mcp-adapter` therefore initialize from the child's inherited working directory and environment, but do not share the parent's live connections or process-local approvals. Authentication, provider cache identity, working directory, and filesystem are intentionally shared. Parallel children therefore still require file ownership boundaries or separate worktrees when they may write overlapping files.
 
 ## Cache compatibility
 
@@ -63,6 +63,7 @@ Requirements:
 
 - Node.js 22.19 or newer
 - Pi 0.84.x
+- Stateful extensions must be available through normal Pi package/extension discovery in the child process
 
 ```bash
 npm install
