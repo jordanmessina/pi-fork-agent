@@ -1,16 +1,18 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { findPackageJSON } from "node:module";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	CURRENT_SESSION_VERSION,
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
 	type ExtensionAPI,
 	formatSize,
+	getPackageDir,
 	type SessionEntry,
 	SessionManager,
 	truncateHead,
@@ -21,9 +23,34 @@ const TOOL_NAME = "fork_agent";
 const CHILD_MARKER_TYPE = "fork-agent-child";
 const COMPACTION_SIGNAL_ENV = "PI_FORK_AGENT_COMPACTION_SIGNAL";
 const RUNNER_PATH = fileURLToPath(new URL("./runner.mjs", import.meta.url));
-const SDK_MODULE_URL = import.meta.resolve("@earendil-works/pi-coding-agent");
-const AI_MODULE_URL = import.meta.resolve("@earendil-works/pi-ai");
 const MAX_RUNNER_DIAGNOSTIC_LENGTH = 64 * 1024;
+
+interface PackageManifest {
+	main?: string;
+	exports?: {
+		"."?: string | { import?: string; default?: string };
+	};
+}
+
+function packageModuleUrl(packageJsonPath: string): string {
+	const manifest = JSON.parse(readFileSync(packageJsonPath, "utf8")) as PackageManifest;
+	const rootExport = manifest.exports?.["."];
+	const entry =
+		typeof rootExport === "string"
+			? rootExport
+			: rootExport?.import ?? rootExport?.default ?? manifest.main;
+	if (!entry) throw new Error(`Cannot determine the module entry for ${packageJsonPath}.`);
+	return pathToFileURL(resolve(dirname(packageJsonPath), entry)).href;
+}
+
+// Pi exposes its core packages to extension imports through jiti aliases. Those
+// aliases intentionally do not affect import.meta.resolve(), so locate the host
+// package entries from Pi's own package root for the standalone child process.
+const SDK_PACKAGE_JSON = join(getPackageDir(), "package.json");
+const SDK_MODULE_URL = packageModuleUrl(SDK_PACKAGE_JSON);
+const AI_PACKAGE_JSON = findPackageJSON("@earendil-works/pi-ai", SDK_MODULE_URL);
+if (!AI_PACKAGE_JSON) throw new Error("Cannot locate Pi's @earendil-works/pi-ai package.");
+const AI_MODULE_URL = packageModuleUrl(AI_PACKAGE_JSON);
 
 function isForkedChild(entries: SessionEntry[]): boolean {
 	return entries.some((entry) => entry.type === "custom" && entry.customType === CHILD_MARKER_TYPE);

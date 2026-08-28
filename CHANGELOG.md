@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Resolve child runtime module URLs from Pi's host package instead of using `import.meta.resolve()`, which bypasses Pi's extension aliases in production installs.
+- Make the smoke test exercise normal extension startup from a production-style package copy without `node_modules`, rather than the metadata-only model-list path.
+
 ## 0.1.1
 
 - Bind child extensions before prompting so `session_start` initializes stateful extensions such as `pi-mcp-adapter`.

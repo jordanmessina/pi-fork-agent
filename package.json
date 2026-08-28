@@ -25,6 +25,7 @@
     "index.ts",
     "runner.mjs",
     "scripts/poor-mans-eval.sh",
+    "scripts/smoke-production.mjs",
     "test/fixtures/*.md",
     "README.md",
     "CHANGELOG.md",
@@ -42,7 +43,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "smoke": "pi --offline --no-extensions --extension ./index.ts --list-models __pi_fork_agent_no_match__",
+    "smoke": "node scripts/smoke-production.mjs",
     "check": "npm run typecheck && node --check runner.mjs && npm test && npm run smoke",
     "pack:check": "npm pack --dry-run"
   },

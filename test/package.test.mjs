@@ -10,6 +10,8 @@ test("package declares a discoverable Pi extension", async () => {
   assert.ok(manifest.keywords.includes("pi-package"));
   assert.deepEqual(manifest.pi.extensions, ["./index.ts"]);
   assert.ok(manifest.files.includes("runner.mjs"));
+  assert.ok(manifest.files.includes("scripts/smoke-production.mjs"));
+  assert.equal(manifest.scripts.smoke, "node scripts/smoke-production.mjs");
   assert.equal(manifest.engines.node, ">=22.19.0");
   assert.equal(manifest.peerDependencies["@earendil-works/pi-coding-agent"], ">=0.84.1 <0.85.0");
 });
